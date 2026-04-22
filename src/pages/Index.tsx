@@ -1,348 +1,367 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 
-const REVIEWS = [
-  { text: '«Думал развод, но всё норм»', date: '22 апр', stars: 5 },
-  { text: '«Лучший курс, всё чётко»', date: '21 апр', stars: 5 },
-  { text: '«Монеты пришли за 20 минут»', date: '20 апр', stars: 5 },
-  { text: '«Беру уже третий раз — всё топ»', date: '19 апр', stars: 5 },
-  { text: '«Честный сервис, рекомендую»', date: '18 апр', stars: 4 },
+// ─── Types & Data ─────────────────────────────────────────────────────────────
+
+type Platform = 'PS' | 'Xbox' | 'PC';
+type Amount = '100k' | '300k' | '500k' | '1M' | 'custom';
+
+const RATES: Record<Platform, Record<string, number>> = {
+  PS:   { '100k': 14,  '300k': 40,  '500k': 62,  '1M': 120 },
+  Xbox: { '100k': 13,  '300k': 38,  '500k': 59,  '1M': 115 },
+  PC:   { '100k': 12,  '300k': 36,  '500k': 56,  '1M': 110 },
+};
+
+const AMOUNTS: { label: string; key: Amount }[] = [
+  { label: '100k', key: '100k' },
+  { label: '300k', key: '300k' },
+  { label: '500k', key: '500k' },
+  { label: '1M',   key: '1M' },
+  { label: 'Своё', key: 'custom' },
 ];
 
-const LIVE_ORDERS = [
-  { ago: '25 сек назад', pack: '1M',   amount: '+ 100K', idx: 4 },
-  { ago: '1 мин назад',  pack: '100K', amount: '+ 500K', idx: 8 },
-  { ago: '2 мин назад',  pack: '500K', amount: '+ 1.2M', idx: 2 },
-  { ago: '5 мин назад',  pack: '1.2M', amount: '',        idx: 5 },
-];
+// ─── Icons inline SVG ─────────────────────────────────────────────────────────
 
-const RATE = 140 / 100_000;
-const fmt = (n: number) => n >= 1_000_000 ? `${n / 1_000_000}M` : `${n / 1_000}K`;
-
-function Stars({ count }: { count: number }) {
+function PSIcon() {
   return (
-    <div className="flex gap-0.5 mt-1">
-      {[1,2,3,4,5].map(i => (
-        <span key={i} style={{ color: i <= count ? '#3b82f6' : '#1a2540', fontSize: 11 }}>★</span>
-      ))}
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8.985 2.596v17.548l3.915 1.261V6.688c0-.69.304-1.151.794-.996.637.194.763.84.763 1.53v5.877c2.073.95 3.704-.13 3.704-3.424 0-3.384-1.146-4.927-4.508-6.022-1.195-.39-3.382-.94-4.668-1.057zM2 18.806l4.93 1.395V16.56l-4.93-1.395v3.64zm17.857-9.274c-1.692-.515-3.887-.376-5.306.23v2.634c1.198-.497 3.462-.676 3.462.852 0 1.44-1.867 1.664-3.462 1.04v2.699c2.38.537 5.306-.004 5.306-3.455 0-1.664-.69-2.618-2-3zm-5.306 9.768l4.93-1.395v-3.64l-4.93 1.395v3.64z"/>
+    </svg>
+  );
+}
+
+function XboxIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M4.102 6.195C2.77 7.768 2 9.791 2 12c0 4.236 2.77 7.836 6.617 9.094-1.206-.83-4.687-4.332-4.515-14.9zM12 2a9.978 9.978 0 0 0-5.93 1.945c1.046-.76 3.523-1.25 5.93 1.502 2.407-2.751 4.884-2.262 5.93-1.502A9.978 9.978 0 0 0 12 2zm5.383 4.195c.172 10.568-3.309 14.07-4.515 14.9C16.715 19.836 19.485 16.236 19.485 12c0-2.209-.77-4.232-2.102-5.805zM12 7.123c-3.16 2.648-4.697 5.82-4.697 7.52 0 2.59 2.1 4.692 4.697 4.692s4.697-2.102 4.697-4.693c0-1.699-1.537-4.872-4.697-7.519z"/>
+    </svg>
+  );
+}
+
+function PCIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 3H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h7v2H8a1 1 0 0 0 0 2h8a1 1 0 0 0 0-2h-3v-2h7a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1zm-1 12H5V5h14v10z"/>
+    </svg>
+  );
+}
+
+function TgIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+    </svg>
+  );
+}
+
+function CardIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 4H4c-1.103 0-2 .897-2 2v12c0 1.103.897 2 2 2h16c1.103 0 2-.897 2-2V6c0-1.103-.897-2-2-2zm0 2v2H4V6h16zm0 12H4v-6h16v6zm-3 0v-2h2v2h-2zm-4 0v-2h2v2h-2z"/>
+    </svg>
+  );
+}
+
+function DiamondIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 10 10" fill="#3b82f6">
+      <polygon points="5,0 10,5 5,10 0,5" />
+    </svg>
+  );
+}
+
+// ─── Calculator ───────────────────────────────────────────────────────────────
+function Calculator() {
+  const [platform, setPlatform] = useState<Platform>('PS');
+  const [amount, setAmount]     = useState<Amount>('100k');
+  const [custom, setCustom]     = useState('');
+
+  const price = amount === 'custom'
+    ? (parseInt(custom || '0') * (RATES[platform]['100k'] / 100_000)) | 0
+    : RATES[platform][amount];
+
+  const platforms: { key: Platform; label: string; icon: React.ReactNode }[] = [
+    { key: 'PS',   label: 'PS',   icon: <PSIcon /> },
+    { key: 'Xbox', label: 'Xbox', icon: <XboxIcon /> },
+    { key: 'PC',   label: 'PC',   icon: <PCIcon /> },
+  ];
+
+  return (
+    <div className="card-calc p-6 flex flex-col gap-5">
+      {/* Title */}
+      <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.14em', color: 'rgba(148,163,184,0.6)', textTransform: 'uppercase' }}>
+        Калькулятор
+      </p>
+
+      {/* Platform */}
+      <div>
+        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', color: 'rgba(148,163,184,0.55)', textTransform: 'uppercase', marginBottom: 8 }}>
+          Платформа
+        </p>
+        <div className="flex gap-2">
+          {platforms.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setPlatform(p.key)}
+              className={`plat-btn ${platform === p.key ? 'active' : ''}`}
+            >
+              <span style={{ color: platform === p.key ? '#3b82f6' : 'rgba(148,163,184,0.5)' }}>{p.icon}</span>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Amount */}
+      <div>
+        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', color: 'rgba(148,163,184,0.55)', textTransform: 'uppercase', marginBottom: 8 }}>
+          Количество монет
+        </p>
+        <div className="flex gap-2">
+          {AMOUNTS.map(a => (
+            <button
+              key={a.key}
+              onClick={() => setAmount(a.key)}
+              className={`amt-btn ${amount === a.key ? 'active' : ''}`}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+        {amount === 'custom' && (
+          <input
+            type="number"
+            placeholder="Введите количество"
+            value={custom}
+            onChange={e => setCustom(e.target.value)}
+            style={{
+              marginTop: 10,
+              width: '100%',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 7,
+              padding: '9px 14px',
+              color: '#e2e8f0',
+              fontSize: 13,
+              fontFamily: 'Inter',
+              outline: 'none',
+            }}
+          />
+        )}
+      </div>
+
+      {/* Total */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.07)', borderBottom: '1px solid rgba(255,255,255,0.07)', paddingTop: 14, paddingBottom: 14 }}>
+        <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.6)' }}>Итого</span>
+        <span style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>
+          {price ? `${price} ₽` : '—'}
+        </span>
+      </div>
+
+      {/* Buttons */}
+      <div className="flex flex-col gap-2.5">
+        <button className="btn-primary">
+          <TgIcon /> Купить через Telegram
+        </button>
+        <button className="btn-secondary">
+          <CardIcon /> Купить на сайте
+        </button>
+      </div>
+
+      {/* Payment note */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+        <Icon name="Lock" size={12} style={{ color: 'rgba(148,163,184,0.4)' }} />
+        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)' }}>Оплата картой или криптой (USDT)</span>
+      </div>
     </div>
   );
 }
 
-function LogoDiamond({ size = 90 }: { size?: number }) {
-  const s = size * 0.76;
-  return (
-    <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
-      <div
-        className="logo-diamond flex items-center justify-center"
-        style={{ width: s, height: s }}
-      >
-        <span className="logo-r select-none" style={{ fontSize: s * 0.38 }}>R</span>
-      </div>
-      <div style={{
-        position: 'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)',
-        background: 'rgba(5,8,18,0.92)', border: '1px solid rgba(59,130,246,0.5)',
-        borderRadius: '50%', width: 20, height: 20,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 0 10px rgba(59,130,246,0.6)', zIndex: 10,
-      }}>
-        <Icon name="ShieldCheck" size={11} style={{ color: '#60a5fa' }} />
-      </div>
-    </div>
-  );
-}
-
-// ─── Inline Calculator (right panel) ─────────────────────────────────────────
-function CalcPanel() {
-  const [coins, setCoins] = useState(1_000_000);
-  const price = Math.ceil(coins * RATE);
-  const pct = ((coins - 100_000) / 9_900_000) * 100;
-
-  return (
-    <div className="glass-panel p-6 flex flex-col h-full" style={{ position: 'relative' }}>
-      <div style={{ position: 'absolute', top: 0, left: '20%', right: '20%', height: 1, background: 'linear-gradient(to right, transparent, rgba(59,130,246,0.7), transparent)', borderRadius: 9999 }} />
-
-      <h2 className="font-orbitron font-bold mb-5" style={{ fontSize: 14, color: '#e2e8f0', letterSpacing: '0.08em' }}>
-        РАССЧИТАТЬ СТОИМОСТЬ
-      </h2>
-
-      {/* Slider */}
-      <div className="mb-4">
-        <div className="flex justify-between mb-2">
-          <span style={{ fontSize: 11, fontFamily: 'Rajdhani', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.38)' }}>МОНЕТЫ</span>
-          <span className="font-rajdhani font-bold" style={{ color: '#60a5fa', fontSize: 13 }}>{fmt(coins)}</span>
-        </div>
-        <input
-          type="range" min={100_000} max={10_000_000} step={100_000}
-          value={coins}
-          onChange={e => setCoins(Number(e.target.value))}
-          style={{ background: `linear-gradient(to right, #3b82f6 ${pct}%, rgba(255,255,255,0.08) ${pct}%)` }}
-        />
-        <div className="flex justify-between mt-1">
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', fontFamily: 'Rajdhani' }}>100K</span>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', fontFamily: 'Rajdhani' }}>10M</span>
-        </div>
-      </div>
-
-      {/* Quick picks */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {[500_000, 1_000_000, 2_000_000, 5_000_000].map(v => (
-          <button
-            key={v}
-            onClick={() => setCoins(v)}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-all font-rajdhani font-semibold tracking-wider ${coins === v ? 'btn-blue text-white' : 'text-white/40 hover:text-white/70'}`}
-            style={coins !== v ? { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' } : {}}
-          >
-            {fmt(v)}
-          </button>
-        ))}
-      </div>
-
-      {/* Platforms */}
-      <div className="flex gap-2 mb-5">
-        {['🕹️ PS', '🎮 Xbox', '🖥️ ПК'].map(p => (
-          <div key={p} className="badge-pill flex-1 justify-center" style={{ fontSize: 10 }}>{p}</div>
-        ))}
-      </div>
-
-      <div style={{ flex: 1 }} />
-
-      {/* Price */}
-      <div className="glass-panel-blue rounded-xl px-4 py-3 flex items-center justify-between mb-4">
-        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'Rajdhani', letterSpacing: '0.07em' }}>ИТОГО</span>
-        <div className="flex items-baseline gap-1">
-          <span className="font-orbitron font-bold glow-text" style={{ fontSize: 24 }}>{price}</span>
-          <span style={{ color: '#60a5fa', fontFamily: 'Rajdhani', fontSize: 14 }}>₽</span>
-        </div>
-      </div>
-
-      <button className="btn-blue w-full text-white py-3 rounded-xl flex items-center justify-center gap-2" style={{ fontSize: 13 }}>
-        <span>✈</span> Оформить заказ
-      </button>
-    </div>
-  );
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Index() {
-  const [reviewsExpanded, setReviewsExpanded] = useState(false);
-  const shown = reviewsExpanded ? REVIEWS : REVIEWS.slice(0, 3);
-
   return (
-    <div className="min-h-screen relative overflow-x-hidden">
+    <div style={{ minHeight: '100vh', position: 'relative' }}>
+      <div className="page-bg" />
 
-      {/* BACKGROUND */}
-      <div className="scene-bg">
-        <div className="floor-glow" />
-        <div className="streak streak-l1" />
-        <div className="streak streak-l2" />
-        <div className="streak streak-r1" />
-        <div className="streak streak-r2" />
-        <div className="spark" style={{ bottom: '38%', left: '47%', background: '#f97316', '--tx': '18px', '--ty': '-28px', animationDelay: '0s', animationDuration: '2s' } as React.CSSProperties} />
-        <div className="spark" style={{ bottom: '36%', left: '52%', background: '#fb923c', '--tx': '-12px', '--ty': '-22px', animationDelay: '0.7s', animationDuration: '2.4s' } as React.CSSProperties} />
-        <div className="spark" style={{ bottom: '39%', left: '50%', background: '#fbbf24', width: 2, height: 2, '--tx': '8px', '--ty': '-18px', animationDelay: '1.3s', animationDuration: '1.8s' } as React.CSSProperties} />
-      </div>
+      <div className="relative" style={{ zIndex: 1, maxWidth: 1160, margin: '0 auto', padding: '0 32px' }}>
 
-      {/* PAGE WRAPPER */}
-      <div className="relative z-10 min-h-screen flex flex-col" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px' }}>
-
-        {/* ── TOP NAV ── */}
-        <nav className="flex items-center justify-between pt-6 pb-4 anim-1">
-          <div className="flex items-center gap-3">
-            <LogoDiamond size={48} />
-            <div>
-              <span className="font-orbitron font-bold chrome-text" style={{ fontSize: 16, letterSpacing: '0.16em' }}>ROMB COINS</span>
-              <p className="font-rajdhani" style={{ fontSize: 10, color: 'rgba(147,197,253,0.55)', letterSpacing: '0.1em', marginTop: 1 }}>ПРОДАЖА МОНЕТ FC 26</p>
-            </div>
+        {/* ── NAV ── */}
+        <nav className="anim-1" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 52 }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DiamondIcon size={10} />
+            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', color: '#e2e8f0', textTransform: 'uppercase' }}>
+              FC26 Coins
+            </span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="badge-pill" style={{ fontSize: 10 }}>
-              <Icon name="Shield" size={9} style={{ color: '#60a5fa' }} />
-              Comfort method
+
+          {/* Platform links */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(148,163,184,0.7)', fontSize: 13 }}>
+              <PSIcon /> PS
             </div>
-            <div className="badge-pill" style={{ fontSize: 10 }}>
-              <Icon name="Zap" size={9} style={{ color: '#60a5fa' }} />
-              Без передачи аккаунтов
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(148,163,184,0.7)', fontSize: 13 }}>
+              <XboxIcon /> Xbox
             </div>
-            <div className="badge-pill hidden md:inline-flex" style={{ fontSize: 10 }}>
-              <span style={{ color: '#4ade80', fontSize: 8 }}>●</span>
-              Онлайн
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(148,163,184,0.7)', fontSize: 13 }}>
+              <PCIcon /> PC
             </div>
           </div>
         </nav>
 
-        <div style={{ height: 1, background: 'linear-gradient(to right, transparent, rgba(59,130,246,0.2), transparent)', marginBottom: 32 }} />
+        {/* ── HERO + CALC ── */}
+        <div className="anim-2" style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 48, alignItems: 'start', marginBottom: 72 }}>
 
-        {/* ── HERO + CALC (two columns) ── */}
-        <div className="grid gap-6 anim-2" style={{ gridTemplateColumns: '1fr 360px', alignItems: 'start' }}>
+          {/* LEFT */}
+          <div>
+            {/* Headline */}
+            <h1 style={{ fontSize: 'clamp(32px, 4vw, 50px)', fontWeight: 700, lineHeight: 1.2, color: '#e2e8f0', marginBottom: 24 }}>
+              Продажа монет{' '}
+              <em style={{ fontStyle: 'italic', color: '#3b82f6', fontWeight: 700 }}>FC 26</em>
+              <br />
+              с гарантией{' '}
+              <span style={{ color: '#3b82f6' }}>от бана</span>
+              <br />
+              по <span style={{ color: '#3b82f6' }}>выгодной цене</span>
+            </h1>
 
-          {/* LEFT — Hero */}
-          <div className="flex flex-col gap-6">
-
-            {/* Hero text */}
-            <div>
-              <p className="font-rajdhani font-semibold mb-2" style={{ fontSize: 12, color: 'rgba(147,197,253,0.55)', letterSpacing: '0.18em' }}>
-                FC 26 · ULTIMATE TEAM
-              </p>
-              <h1 className="chrome-text font-orbitron font-bold leading-tight mb-3" style={{ fontSize: 'clamp(28px, 3.5vw, 44px)', letterSpacing: '0.04em' }}>
-                Монеты<br />без риска бана
-              </h1>
-              <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, fontFamily: 'Inter', lineHeight: 1.6, maxWidth: 420 }}>
-                Быстрая доставка comfort-методом на PS, Xbox и ПК. Без передачи пароля. Работаем с 2022 года.
-              </p>
-            </div>
-
-            {/* Price highlight */}
-            <div className="flex items-center gap-4">
-              <div className="glass-panel-blue rounded-2xl px-5 py-4 flex flex-col gap-1">
-                <span style={{ fontSize: 10, fontFamily: 'Rajdhani', letterSpacing: '0.1em', color: 'rgba(147,197,253,0.5)' }}>СТАРТОВАЯ ЦЕНА</span>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="font-orbitron font-bold glow-text" style={{ fontSize: 28 }}>140</span>
-                  <span style={{ color: '#60a5fa', fontFamily: 'Rajdhani', fontSize: 14 }}>₽ / 1M монет</span>
-                </div>
+            {/* Badges */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 32 }}>
+              <div className="badge">
+                <Icon name="Lock" size={11} style={{ color: 'rgba(148,163,184,0.6)' }} />
+                Comfort method
               </div>
-              <div className="glass-panel rounded-2xl px-5 py-4 flex flex-col gap-1">
-                <span style={{ fontSize: 10, fontFamily: 'Rajdhani', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)' }}>ЗАКАЗОВ ЗА МЕСЯЦ</span>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="font-orbitron font-bold" style={{ fontSize: 28, color: '#e2e8f0' }}>9 820</span>
-                </div>
+              <div className="badge">
+                <Icon name="Zap" size={11} style={{ color: 'rgba(148,163,184,0.6)' }} />
+                Без передачи через рынок
               </div>
             </div>
 
-            {/* Platforms */}
-            <div className="flex items-center gap-2">
+            {/* Price tiers */}
+            <div style={{ display: 'flex', gap: 32, marginBottom: 36 }}>
               {[
-                { l: 'PlayStation', e: '🕹️' },
-                { l: 'Xbox', e: '🎮' },
-                { l: 'PC', e: '🖥️' },
-              ].map((p, i) => (
-                <div key={i} className="glass-panel flex items-center gap-2 px-4 py-2.5 rounded-xl">
-                  <span style={{ fontSize: 16 }}>{p.e}</span>
-                  <span className="font-rajdhani font-semibold" style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.05em' }}>{p.l}</span>
+                { amount: '100k', price: 'от 12 ₽' },
+                { amount: '500k', price: 'от 58 ₽' },
+                { amount: '1M',   price: 'от 103 ₽' },
+              ].map(t => (
+                <div key={t.amount}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: '#e2e8f0', lineHeight: 1.1 }}>{t.amount}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.55)', marginTop: 2 }}>{t.price}</div>
                 </div>
               ))}
             </div>
 
-            {/* Guarantee bar */}
-            <div className="glass-panel-blue rounded-2xl px-5 py-4 flex items-center gap-3">
-              <div style={{
-                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 0 15px rgba(59,130,246,0.3)',
-              }}>
-                <Icon name="ShieldCheck" size={20} style={{ color: '#60a5fa' }} />
-              </div>
-              <div>
-                <p className="font-rajdhani font-bold" style={{ fontSize: 14, color: 'rgba(226,232,240,0.88)', letterSpacing: '0.06em' }}>
-                  ГАРАНТИЯ ОТ БАНА
-                </p>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', fontFamily: 'Inter', marginTop: 2 }}>
-                  0 заблокированных аккаунтов за всё время работы
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT — Calculator */}
-          <div className="anim-3">
-            <CalcPanel />
-          </div>
-        </div>
-
-        {/* ── DIVIDER ── */}
-        <div style={{ height: 1, background: 'linear-gradient(to right, transparent, rgba(59,130,246,0.2), transparent)', margin: '36px 0' }} />
-
-        {/* ── BOTTOM ROW: Reviews + Stats ── */}
-        <div className="grid gap-5 pb-10 anim-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
-
-          {/* Reviews */}
-          <div className="glass-panel p-5" style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', top: 0, left: '20%', right: '20%', height: 1, background: 'linear-gradient(to right, transparent, rgba(59,130,246,0.5), transparent)' }} />
-            <h3 className="font-orbitron font-bold mb-4" style={{ fontSize: 12, color: 'rgba(226,232,240,0.85)', letterSpacing: '0.1em' }}>
-              ОТЗЫВЫ КЛИЕНТОВ
-            </h3>
-
-            {shown.map((r, i) => (
-              <div
-                key={i}
-                className={`py-2.5 flex items-start justify-between gap-3 ${i < shown.length - 1 ? 'border-b' : ''}`}
-                style={{ borderColor: 'rgba(255,255,255,0.05)' }}
-              >
+            {/* Buy options */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
+              <div className="buy-card active" style={{ flex: 1 }}>
+                <div className="buy-card-icon" style={{ background: 'rgba(29,161,242,0.15)' }}>
+                  <TgIcon />
+                </div>
                 <div>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontFamily: 'Inter' }}>{r.text}</p>
-                  <Stars count={r.stars} />
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Купить через Telegram</div>
+                  <div style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', marginTop: 2 }}>Быстрый заказ</div>
                 </div>
-                <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: 11, flexShrink: 0, fontFamily: 'Rajdhani', letterSpacing: '0.04em' }}>{r.date}</span>
               </div>
-            ))}
 
-            {!reviewsExpanded && (
-              <button
-                onClick={() => setReviewsExpanded(true)}
-                className="mt-3 font-rajdhani font-semibold hover:opacity-70 transition-opacity"
-                style={{ color: '#60a5fa', fontSize: 11, letterSpacing: '0.07em' }}
-              >
-                ПОКАЗАТЬ ЕЩЁ →
-              </button>
-            )}
+              <span style={{ color: 'rgba(148,163,184,0.3)', fontSize: 12 }}>или</span>
+
+              <div className="buy-card" style={{ flex: 1 }}>
+                <div className="buy-card-icon" style={{ background: 'rgba(148,163,184,0.08)' }}>
+                  <CardIcon />
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Купить на сайте</div>
+                  <div style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', marginTop: 2 }}>Оплата онлайн</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Trust line */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="ShieldCheck" size={13} style={{ color: 'rgba(148,163,184,0.4)' }} />
+              <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', letterSpacing: '0.02em' }}>
+                Безопасно • Быстро • Поддержка 24/7
+              </span>
+            </div>
           </div>
 
-          {/* Live orders / Stats */}
-          <div className="glass-panel p-5" style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', top: 0, left: '20%', right: '20%', height: 1, background: 'linear-gradient(to right, transparent, rgba(59,130,246,0.5), transparent)' }} />
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-orbitron font-bold" style={{ fontSize: 12, color: 'rgba(226,232,240,0.85)', letterSpacing: '0.1em' }}>
-                ПОСЛЕДНИЕ ЗАКАЗЫ
-              </h3>
-              <div className="flex items-center gap-1.5">
-                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80', animation: 'pulse 2s infinite' }} />
-                <span className="font-rajdhani" style={{ fontSize: 10, color: '#4ade80', letterSpacing: '0.06em' }}>LIVE</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between py-2 border-b mb-1" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-              <div className="flex items-center gap-2">
-                <Icon name="BarChart2" size={12} style={{ color: '#3b82f6', flexShrink: 0 }} />
-                <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, fontFamily: 'Inter' }}>9 820 завершённых заказов</span>
-              </div>
-              <span style={{ fontSize: 10, color: '#f59e0b', fontFamily: 'Rajdhani', fontWeight: 600 }}>+36 / -26</span>
-            </div>
-
-            {LIVE_ORDERS.map((o, i) => (
-              <div
-                key={i}
-                className={`flex items-center justify-between py-2.5 ${i < LIVE_ORDERS.length - 1 ? 'border-b' : ''}`}
-                style={{ borderColor: 'rgba(255,255,255,0.05)' }}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                    background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.28)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 8, fontWeight: 700, color: '#93c5fd', fontFamily: 'Orbitron',
-                  }}>
-                    {o.idx}
-                  </div>
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'Inter' }}>
-                    {o.ago} / <span style={{ color: 'rgba(255,255,255,0.68)', fontFamily: 'Rajdhani', fontWeight: 600 }}>{o.pack}</span>
-                  </span>
-                </div>
-                {o.amount && (
-                  <span className="font-rajdhani font-semibold" style={{ fontSize: 12, color: '#60a5fa', letterSpacing: '0.03em' }}>
-                    {o.amount}
-                  </span>
-                )}
-              </div>
-            ))}
+          {/* RIGHT — Calc */}
+          <div className="anim-3">
+            <Calculator />
           </div>
         </div>
 
-        {/* FOOTER */}
-        <div style={{ height: 1, background: 'linear-gradient(to right, transparent, rgba(59,130,246,0.12), transparent)', marginBottom: 20 }} />
-        <p className="text-center pb-6 font-rajdhani" style={{ fontSize: 10, color: 'rgba(255,255,255,0.12)', letterSpacing: '0.07em' }}>
-          © 2026 ROMB COINS · НЕ ЯВЛЯЕТСЯ ОФИЦИАЛЬНЫМ ПАРТНЁРОМ EA SPORTS
-        </p>
+        {/* ── BOTTOM 3-COL SECTION ── */}
+        <div className="anim-4" style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 40, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 48, paddingBottom: 48 }}>
+
+          {/* Как это работает */}
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0', marginBottom: 20 }}>Как это работает</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {[
+                { n: 1, title: 'Выбираете монеты' },
+                { n: 2, title: 'Оплачиваете на сайте или в TG' },
+                { n: 3, title: 'Передаёте данные' },
+                { n: 4, title: 'Получаете монеты' },
+              ].map(s => (
+                <div key={s.n} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="step-num">{s.n}</div>
+                  <span style={{ fontSize: 13, color: 'rgba(203,213,225,0.75)' }}>{s.title}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Гарантия безопасности */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+              <Icon name="ShieldCheck" size={15} style={{ color: '#3b82f6' }} />
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Гарантия безопасности</h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                'Comfort method',
+                'Минимальный риск бана',
+                'Данные не сохраняются',
+                'Выход после выполнения',
+              ].map(item => (
+                <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', marginTop: 5, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: 'rgba(203,213,225,0.75)' }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Почему выгодно */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+              <Icon name="Tag" size={15} style={{ color: '#3b82f6' }} />
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Почему выгодно</h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                'Прямая доставка без посредников',
+                'Цены ниже среднего по рынку',
+                'Чем больше объём — тем дешевле курс',
+              ].map(item => (
+                <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', marginTop: 5, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: 'rgba(203,213,225,0.75)' }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── FOOTER ── */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.35)' }}>© 2025 FC26 Coins</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <DiamondIcon size={8} />
+            <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.35)' }}>Comfort Method</span>
+          </div>
+        </div>
       </div>
     </div>
   );
